@@ -97,3 +97,15 @@ ggplot(bootstrap_df, aes(x = "", y = R_squared)) +
     caption  = "2.5% and 97.5% quantile values showed in red"
   )
 ```
+
+## Problem 2
+
+```{r}
+homicide_df = 
+  read_csv(file = "./homicide-data.csv", na = c("NA", ".", "")) %>%
+  janitor::clean_names() %>% 
+  distinct() %>% 
+  mutate(
+    city_state = paste(city, ",", state),
+    status = ifelse(disposition %in% c("Closed without arrest", "Open/No arrest"), 
+                    "Unsolved", "Solved")) 
