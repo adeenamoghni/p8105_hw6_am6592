@@ -44,7 +44,6 @@ boot_function = function(df) {
     log_B0_B1 = log(coeff[1] * coeff[2])
   
   tibble(R_squared = R_squared, log_B0_B1 = log_B0_B1)
-  
 }
 ```
 
@@ -100,3 +99,168 @@ ggplot(bootstrap_df, aes(x = "", y = R_squared)) +
 ```
 
 ![](HW6_files/figure-gfm/unnamed-chunk-5-2.png)<!-- -->
+
+## Problem 2
+
+``` r
+homicide_df = 
+  read_csv(file = "./homicide-data.csv", na = c("NA", ".", "", "Unknown")) %>%
+  janitor::clean_names() %>% 
+  distinct() %>% 
+  mutate(
+    city_state = paste(city, ",", state),
+    status = ifelse(disposition %in% c("Closed without arrest", "Open/No arrest"), 
+                    "0", "1"),
+    status = as.numeric(status),
+    victim_age = as.numeric(victim_age)) %>% 
+  filter(!city %in% c("Dallas", "Phoenix", "Kansas City", "Tulsa"),
+         victim_race %in% c("Black", "White"))
+```
+
+    ## Rows: 52179 Columns: 12
+    ## ── Column specification ────────────────────────────────────────────────────────
+    ## Delimiter: ","
+    ## chr (8): uid, victim_last, victim_first, victim_race, victim_sex, city, stat...
+    ## dbl (4): reported_date, victim_age, lat, lon
+    ## 
+    ## ℹ Use `spec()` to retrieve the full column specification for this data.
+    ## ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+
+``` r
+baltimore_df = 
+  homicide_df %>% 
+  filter(city == "Baltimore")
+
+model = glm(status ~ victim_age + victim_sex + victim_race, 
+            family = binomial(link = "logit"), 
+            data = baltimore_df) %>% 
+  broom::tidy(conf.int = TRUE) %>% 
+  mutate(
+    odds_ratio = exp(estimate),
+    lower_ci = exp(conf.low), 
+    upper_ci = exp(conf.high),
+    ) %>% 
+  select(term, estimate, odds_ratio, lower_ci, upper_ci) %>% 
+  filter(term == "victim_sexMale")
+```
+
+``` r
+city_df = 
+  homicide_df %>% 
+  nest(data = -city) %>% 
+  mutate(
+    model = map(data, 
+              \(df) glm(status ~ victim_age + victim_sex + victim_race, 
+            family = binomial(link = "logit"), 
+            data = df)),
+    results = map(model, ~broom::tidy(.x, conf.int = TRUE))
+    ) %>% 
+  unnest(results) %>% 
+  mutate(
+    odds_ratio = exp(estimate),
+    lower_ci = exp(conf.low), 
+    upper_ci = exp(conf.high),
+    ) %>% 
+  select(city, term, estimate, odds_ratio, lower_ci, upper_ci) %>% 
+  filter(term == "victim_sexMale") %>% 
+  mutate(city = fct_reorder(city, odds_ratio))
+```
+
+``` r
+ggplot(city_df, aes(x = city, y = odds_ratio)) +
+  geom_point() + 
+  geom_errorbar(aes(ymin = lower_ci, ymax = upper_ci)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(x = "city", 
+       y = "Estimates Odds Ratio (male vs female)",
+       title = "Odds Ratio (Male vs Female) of Solving Homicides by City"
+       )
+```
+
+![](HW6_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
+
+## Problem 3
+
+``` r
+birth_df = 
+  read_csv(file = "./birthweight.csv", na = c("NA", ".", "", "Unknown")) %>% 
+  janitor::clean_names() %>% 
+  drop_na()%>% 
+  mutate(
+    babysex = as.factor(babysex),
+    frace = as.factor(frace),
+    mrace = as.factor(mrace),
+    maform = as.factor(malform)
+  )
+```
+
+    ## Rows: 4342 Columns: 20
+    ## ── Column specification ────────────────────────────────────────────────────────
+    ## Delimiter: ","
+    ## dbl (20): babysex, bhead, blength, bwt, delwt, fincome, frace, gaweeks, malf...
+    ## 
+    ## ℹ Use `spec()` to retrieve the full column specification for this data.
+    ## ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+
+``` r
+full_model = lm(bwt ~ bhead + blength + gaweeks + mrace + smoken, data = birth_df)
+
+main_model = lm(bwt ~ blength + gaweeks, data = birth_df) 
+
+interaction_model =lm(bwt ~ bhead * blength * babysex, data = birth_df)
+```
+
+``` r
+birth_plot_df = 
+  birth_df %>% 
+  add_residuals(full_model, var = "residuals") %>% 
+  add_predictions(full_model, var = "yhat")
+  
+ggplot(birth_plot_df, aes(x = yhat, y = residuals)) +
+  geom_point(alpha = .3) +
+  geom_line(aes(y = 0), color = "red") +
+  labs(
+    x = "Predicted Birth Weight (yhat)",
+    y = "Residuals",
+    title = "Residual Plot of Full Model",
+    caption = "Full model using lm() regression for birth weight with head circumference, body length, gestational period, race, and mother smoking status as predictors"
+  )
+```
+
+![](HW6_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
+
+``` r
+cv_df = 
+  crossv_mc(birth_df, 100) %>% 
+   mutate(
+    train = map(train, as_tibble),
+    test = map(test, as_tibble)) %>% 
+  mutate( 
+    full_model = map(train, ~lm(bwt ~ bhead + blength + gaweeks + mrace + smoken, data = .x)), 
+    main_model = map(train, ~lm(bwt ~ blength + gaweeks, data = .x)), 
+    interaction_model = map(train, ~lm(bwt ~ bhead * blength * babysex, data = .x)))%>% 
+  mutate(
+      rmse_full = map2_dbl(full_model, test, ~rmse(model = .x, data = .y)),
+    rmse_main = map2_dbl(main_model, test, ~rmse(model = .x, data = .y)),
+    rmse_interaction = map2_dbl(interaction_model, test, ~rmse(model = .x, data = .y)))
+```
+
+``` r
+plot_df = 
+  cv_df %>% 
+  select(starts_with("rmse")) %>% 
+  pivot_longer(
+    everything(),
+    names_to = "model", 
+    values_to = "rmse",
+    names_prefix = "rmse_") 
+   
+ggplot(plot_df, aes(x = model, y = rmse)) + 
+  geom_violin() + 
+  labs(
+    title = "RMSE comparison of the full, main effects, and three-way interaction models",
+    caption = "RMSE calculated by using Monte Carlo cross-validation with n = 100"
+  )
+```
+
+![](HW6_files/figure-gfm/unnamed-chunk-14-1.png)<!-- -->
