@@ -100,6 +100,15 @@ ggplot(bootstrap_df, aes(x = "", y = R_squared)) +
 
 ![](HW6_files/figure-gfm/unnamed-chunk-5-2.png)<!-- -->
 
+As seen from the box plots above, the distributions of the $\hat{r}^2$
+values and the $\log(\hat{\beta}_0 * \hat{\beta}_1)$ are roughly
+symmetric, with the box plot of $\hat{r}^2$ showing more outliers. The
+95% CI for $\hat{r}^2$ is ( 0.8936684 , 0.927106 ) and for
+$\log(\hat{\beta}_0 * \hat{\beta}_1)$ it is ( 1.9649487 , 2.0588875 ),
+meaning we are 95% confident that the true vslues for $\hat{r}^2$ and
+$\log(\hat{\beta}_0 * \hat{\beta}_1)$ lie in between these values,
+respectively.
+
 ## Problem 2
 
 ``` r
@@ -173,11 +182,20 @@ ggplot(city_df, aes(x = city, y = odds_ratio)) +
   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
   labs(x = "city", 
        y = "Estimates Odds Ratio (male vs female)",
-       title = "Odds Ratio (Male vs Female) of Solving Homicides by City"
+       title = "Odds Ratio (Male vs Female) of Solving Homicides by City",
+       caption = "Odd ratio with 95% CI shown"
        )
 ```
 
 ![](HW6_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
+
+As seen from the plot, New York, Baton Rouge, and Omaha have the
+smallest odds ratio, while Fresno, Stockton, Albuquerque have the
+largest. In this case, the odds ratio calculates how the likelihood of
+the status being 1 (i.e. no/ open arrest) changing with a male
+vs. female victim. In cases of having and OR \< 1 (which is the case for
+most cities), a male victim is less likely to have a closed case. THe
+opposite is true for cities with an OR \> 1.
 
 ## Problem 3
 
@@ -223,11 +241,23 @@ ggplot(birth_plot_df, aes(x = yhat, y = residuals)) +
     x = "Predicted Birth Weight (yhat)",
     y = "Residuals",
     title = "Residual Plot of Full Model",
-    caption = "Full model using lm() regression for birth weight with head circumference, body length, gestational period, race, and mother smoking status as predictors"
+    caption = "Regression for birth weight with head circumference, body length, gestational period, race, and mother smoking status as predictors"
   )
 ```
 
 ![](HW6_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
+
+There has been previous data to indicate that race (with Black newborns
+weighing less, on average, than white newborns) and smoking status of
+the mother (i.e if she smokes during pregnancy or not) affects the birth
+weight of a baby. Moreover, gestation time until birth also affects
+birth weight as pre-mature newborns weigh less than full term newborn.
+Head circumference and body length are obvious predictors as the larger
+these values are, the more a newborn is likely to weigh. For these
+reasons, I decided to use these variables as predictors in my full_model
+and compare it to the main effect (called main_model) and interaction
+model, which accounts for the interactions between the predictors
+(called interaction_model).
 
 ``` r
 cv_df = 
@@ -255,7 +285,7 @@ plot_df =
     values_to = "rmse",
     names_prefix = "rmse_") 
    
-ggplot(plot_df, aes(x = model, y = rmse)) + 
+ggplot(plot_df, aes(x = model, y = rmse)) +  
   geom_violin() + 
   labs(
     title = "RMSE comparison of the full, main effects, and three-way interaction models",
@@ -264,3 +294,8 @@ ggplot(plot_df, aes(x = model, y = rmse)) +
 ```
 
 ![](HW6_files/figure-gfm/unnamed-chunk-14-1.png)<!-- -->
+
+As seen, the full model has a lower distribution of RMSE values compared
+to the interaction model, and especially compared to the main effects
+model. This indicates predictive accuracy is highest in the full model,
+followed by the interaction model, then by the main effect model
